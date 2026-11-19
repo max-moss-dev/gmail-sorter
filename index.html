@@ -1,0 +1,847 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Inbox Sorter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root{
+  --bg:#fffaff; --paper:#ffffff; --ink:#2f2a45; --muted:#8a82a0; --line:#f0e9f8; --cell:#f5eefb;
+  --shadow:0 1px 0 rgba(255,255,255,.8),0 10px 28px -12px rgba(120,60,200,.28);
+  --alerts:#ff5a6e; --security:#ffb41f; --deploys:#5b6cff; --people:#2f9bff; --leads:#17c98b;
+  --newsletters:#9b5cff; --promos:#ff8a3d; --social:#ff4fa3; --vendors:#12bfc9; --other:#8d8fa8;
+}
+@media (prefers-color-scheme: dark) and (min-width:99999px){
+  :root:not([data-theme="light"]){
+    --bg:#1b1a17; --paper:#24221e; --ink:#f1ece2; --muted:#9a9286; --line:#36332d; --cell:#2e2b26;
+    --shadow:0 1px 0 rgba(255,255,255,.03),0 8px 24px -12px rgba(0,0,0,.6); --deploys:#9a9ba6;
+  }
+}
+:root[data-theme="never-dark"]{
+  --bg:#1b1a17; --paper:#24221e; --ink:#f1ece2; --muted:#9a9286; --line:#36332d; --cell:#2e2b26;
+  --shadow:0 1px 0 rgba(255,255,255,.03),0 8px 24px -12px rgba(0,0,0,.6); --deploys:#9a9ba6;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+body::before,body::after{content:"";position:fixed;z-index:0;pointer-events:none;filter:blur(80px);opacity:.6;background:linear-gradient(135deg,#ff8fb1,#ffc46b,#7ee8c0,#7fb4ff,#c39bff,#ff8fb1);background-size:300% 300%;animation:morph 14s ease-in-out infinite,drift 9s ease-in-out infinite}
+body::before{width:52vmax;height:52vmax;left:-14vmax;top:-16vmax}
+body::after{width:44vmax;height:44vmax;right:-12vmax;bottom:-18vmax;animation-duration:18s,12s;animation-direction:reverse}
+@keyframes morph{0%,100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%;transform:rotate(0)}33%{border-radius:30% 70% 70% 30%/30% 30% 70% 70%;transform:rotate(60deg)}66%{border-radius:50% 50% 20% 80%/25% 80% 20% 75%;transform:rotate(-30deg)}}
+@keyframes drift{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}
+@keyframes shine{to{background-position:200% 0}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+.wrap{position:relative;z-index:1;max-width:1560px;margin:0 auto;height:100vh;padding:14px 24px 70px;display:flex;flex-direction:column;gap:10px}
+@media (min-width:901px){html,body{overflow:hidden}}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap}
+#board{flex:1;min-height:0}
+.board{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(380px,2.4fr) minmax(0,1fr) minmax(0,1fr);grid-template-rows:repeat(3,minmax(0,1fr));gap:10px;height:100%}
+h1{font:400 46px/1 "Instrument Serif",serif;letter-spacing:-.02em;margin:0}
+h1 em{font-style:italic;color:var(--alerts)}
+.stats{display:flex;gap:26px;flex-wrap:wrap}
+.stat small{display:block;font:500 9.5px/1 Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.stat b{font:400 24px/1 "JetBrains Mono",monospace;font-variant-numeric:tabular-nums}
+.stat.hot b{color:var(--alerts)}
+.layout{flex:1;min-height:0;display:flex;flex-direction:column;gap:10px}
+.group{margin-bottom:18px}
+.group{text-align:left}
+.group h2{font:italic 400 24px/1 "Instrument Serif",serif;margin:0 0 10px;color:var(--ink)}
+.row{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(260px,1fr))}
+.bucket{grid-column:var(--gc);grid-row:var(--gr);display:flex;flex-direction:column;min-height:0;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:10px;box-shadow:var(--shadow);cursor:pointer;transition:transform .2s,box-shadow .2s;position:relative}
+.bucket:hover{transform:translateY(-2px)}
+.bucket.pulse{animation:pulse .5s ease}
+@keyframes pulse{40%{box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 35%,transparent),var(--shadow)}}
+.bucket header{display:flex;align-items:center;gap:7px;margin-bottom:8px;font-weight:600;font-size:13px}
+.bucket header i{width:16px;height:12px;border-radius:2px;background:var(--c);position:relative;flex:none}
+.bucket header i:after{content:"";position:absolute;inset:0;background:linear-gradient(to bottom right,transparent 49%,rgba(255,255,255,.55) 50%,transparent 56%),linear-gradient(to bottom left,transparent 49%,rgba(255,255,255,.55) 50%,transparent 56%);background-size:100% 100%}
+.bucket header span{margin-left:auto;font:500 12px "JetBrains Mono",monospace;color:var(--muted)}
+.cells{display:grid;grid-template-columns:repeat(auto-fill,22px);gap:4px;grid-auto-rows:22px;align-content:start;flex:1;min-height:0;overflow:hidden}
+.cell{border-radius:7px;background:var(--cell)}
+.cell.on{background:var(--c);animation:pop .35s cubic-bezier(.3,1.6,.5,1)}
+.cell.read{opacity:.45}
+@keyframes pop{0%{transform:scale(.2)}100%{transform:scale(1)}}
+.more{font:500 11px "JetBrains Mono",monospace;color:var(--muted);height:15px;margin-top:6px}
+.pile{grid-column:3;grid-row:1/4;min-height:0;background:var(--paper);border:1px solid var(--line);border-radius:24px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
+.pile .top{display:flex;justify-content:space-between;padding:12px 14px 0;font:500 10px Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.stage{position:relative;flex:1;min-height:0;margin:6px}
+.heap{position:absolute;inset:0}
+.hole{position:absolute;inset:0;display:grid;place-content:center;text-align:center;pointer-events:none}
+.hole b{font:400 84px/1 "Instrument Serif",serif;font-variant-numeric:tabular-nums}
+.hole small{font:500 10px Inter;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:6px}
+.env{position:absolute;left:0;top:0;width:50px;height:35px;border-radius:4px;background:var(--c);box-shadow:0 2px 4px rgba(0,0,0,.12);display:flex;align-items:flex-end;justify-content:center;padding-bottom:2px;overflow:hidden;will-change:transform}
+.env:before{content:"";position:absolute;left:0;right:0;top:0;height:60%;background:linear-gradient(to bottom right,transparent 48%,rgba(255,255,255,.5) 50%,transparent 54%) left/50% 100% no-repeat,linear-gradient(to bottom left,transparent 48%,rgba(255,255,255,.5) 50%,transparent 54%) right/50% 100% no-repeat}
+.env img,.cell img,.drawer li img{background:#fff;object-fit:contain}
+.env s,.cell s,.drawer li s{display:grid;place-items:center;background:#fff;color:#3a3832;font:700 11px Inter;text-decoration:none;border-radius:50%}
+.cell s{width:16px;height:16px;font-size:9px}
+.drawer li s{width:18px;height:18px;font-size:10px;align-self:center}
+.env s{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);width:22px;height:22px}
+.env img{position:absolute;left:50%;bottom:4px;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;padding:2.5px;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+.cell{display:grid;place-items:center}
+.cell img{width:16px;height:16px;border-radius:50%;padding:1.5px}
+.more-cell{font:600 9px "JetBrains Mono",monospace;color:var(--paper);background:var(--ink)!important}
+.small .cell img{width:14px;height:14px;padding:1px}
+.env.read{filter:saturate(.55) brightness(1.05)}
+.flying{position:fixed;z-index:50;pointer-events:none;left:0;top:0}
+.ticker{border-top:1px solid var(--line);padding:10px 14px 12px;min-height:62px;text-align:center}
+.ticker small{font:500 10px Inter;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.ticker div{font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:4px}
+.ticker .to{display:inline-block;padding:1px 7px;border-radius:99px;color:#fff;font-size:11px;font-weight:600;margin-right:6px;background:var(--c)}
+body.nonames .ticker .subj{filter:blur(4px)}
+.repeats{margin-top:6px;background:var(--paper);border:1px dashed var(--line);border-radius:14px;padding:12px;cursor:pointer}
+.repeats header{display:flex;gap:8px;align-items:center;font-weight:600;font-size:13px;margin-bottom:8px}
+.repeats header span{margin-left:auto;font:500 12px "JetBrains Mono",monospace;color:var(--muted)}
+.repeats .cells{grid-template-columns:repeat(auto-fill,18px);grid-auto-rows:18px;gap:4px;height:auto;min-height:18px;max-height:calc(18px*3 + 8px)}
+.bar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:6px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:7px;box-shadow:0 10px 30px -10px rgba(0,0,0,.3);z-index:60;max-width:calc(100vw - 32px);overflow-x:auto}
+.bar button{font:500 12px Inter;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+.bar button.primary{background:#fff;color:var(--ink);border-color:#d9c9ee;font-weight:600}
+.bar button.on{background:color-mix(in srgb,var(--alerts) 22%,var(--bg));border-color:var(--alerts)}
+.bar .sep{width:1px;height:22px;background:var(--line);margin:0 3px}
+.bar .hint{font-size:11px;color:var(--muted);padding:0 6px;white-space:nowrap}
+.progress{height:3px;background:var(--line);border-radius:3px;overflow:hidden;margin:0;flex:none}
+.progress i{display:block;height:100%;width:0;background:#c7aaff;transition:width .2s}
+.tip{position:fixed;z-index:80;pointer-events:none;background:#fff;color:var(--ink);box-shadow:0 6px 20px -8px rgba(120,60,200,.35);border:1px solid var(--line);font-size:12px;padding:7px 9px;border-radius:8px;max-width:320px;opacity:0;transition:opacity .12s}
+.tip b{display:block;font-weight:600;margin-bottom:2px}
+.drawer{position:fixed;inset:0 0 0 auto;width:min(460px,100vw);background:var(--paper);border-left:1px solid var(--line);z-index:90;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column;box-shadow:-20px 0 40px -20px rgba(0,0,0,.25)}
+.drawer.open{transform:none}
+.drawer header{padding:20px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+.drawer h3{font:italic 400 30px/1 "Instrument Serif",serif;margin:0}
+.drawer header button{margin-left:auto;border:0;background:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.drawer ul{list-style:none;margin:0;padding:6px 0;overflow:auto}
+.drawer li a{display:grid;grid-template-columns:20px 1fr auto;gap:10px;padding:9px 20px;text-decoration:none;color:inherit;align-items:baseline}
+.drawer li a:hover{background:var(--bg)}
+.drawer li i{width:8px;height:8px;border-radius:50%;background:var(--c);align-self:center}
+.drawer li img{width:18px;height:18px;border-radius:50%;padding:1px;align-self:center;box-shadow:0 0 0 2px var(--c)}
+.drawer li .s{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drawer li .s small{display:block;color:var(--muted);font-size:11.5px}
+.drawer li time{font:11px "JetBrains Mono",monospace;color:var(--muted)}
+.done{position:fixed;inset:0;display:none;place-items:center;z-index:70;background:color-mix(in srgb,var(--bg) 70%,transparent);backdrop-filter:blur(3px)}
+.done.show{display:grid;animation:fade .4s}
+@keyframes fade{from{opacity:0}}
+.done .card{background:var(--paper);border:1px solid var(--line);border-radius:18px;padding:28px 30px;box-shadow:var(--shadow);max-width:520px;width:calc(100% - 32px)}
+.done h3{font:400 40px/1 "Instrument Serif",serif;margin:0 0 6px}
+.done h3 em{color:var(--alerts)}
+.done p{color:var(--muted);margin:0 0 16px}
+.done .bars{display:grid;gap:7px;margin-bottom:18px}
+.done .bars div{display:grid;grid-template-columns:110px 1fr 36px;gap:10px;align-items:center;font-size:12.5px}
+.done .bars span{height:10px;border-radius:3px;background:var(--c);transform-origin:left;animation:grow .8s cubic-bezier(.2,.8,.2,1) both}
+.done .bars em{font:normal 12px "JetBrains Mono",monospace;text-align:right}
+@keyframes grow{from{transform:scaleX(0)}}
+.done button{font:500 13px Inter;border:0;background:var(--ink);color:var(--paper);border-radius:10px;padding:9px 14px;cursor:pointer}
+.empty{padding:40px;text-align:center;color:var(--muted)}
+@media (max-width:900px){
+  .wrap{padding:18px 16px 120px;height:auto}
+  .board{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:none;height:auto}
+  .cells{min-height:120px}
+  h1{font-size:40px}
+  .layout{grid-template-columns:1fr}
+  .pile{grid-column:1/-1;grid-row:auto;height:300px;order:-1}
+  .bucket{grid-column:auto;grid-row:auto}
+  .stats{gap:22px}.stat b{font-size:26px}
+}
+
+.bar select{font:500 12px Inter;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:9px;padding:7px 8px}
+.bar button:disabled{opacity:.45;cursor:default}
+.hint{max-width:320px;overflow:hidden;text-overflow:ellipsis}
+.gate,.confirm{position:fixed;inset:0;display:none;place-items:center;z-index:95;background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:blur(5px)}
+.gate.show,.confirm.show{display:grid;animation:fade .3s}
+.gate .card,.confirm .card{background:var(--paper);border:1px solid var(--line);border-radius:20px;padding:30px;box-shadow:var(--shadow);max-width:540px;width:calc(100% - 32px)}
+.gate h2,.confirm h3{font:400 44px/1 "Instrument Serif",serif;margin:0 0 10px}
+.gate h2 em{color:var(--alerts)}
+.gate p,.confirm p{color:var(--muted);margin:0 0 14px;line-height:1.5}
+.gate ul{margin:0 0 16px;padding-left:18px;color:var(--ink);line-height:1.6}
+.gate .row,.confirm .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gate button,.confirm button,.done .row button{font:500 13px Inter;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:10px;padding:10px 15px;cursor:pointer}
+.gate button.primary,.confirm button.primary,.done .row button.primary{background:#fff;color:var(--ink);border-color:#d9c9ee;font-weight:600}
+.gate label{display:flex;gap:7px;align-items:center;font-size:12px;color:var(--muted);margin-top:14px}
+.gate .err{color:var(--alerts);font-size:12.5px;min-height:18px;margin-top:10px}
+.done .row{display:flex;gap:8px;flex-wrap:wrap}
+.who{font:500 11px "JetBrains Mono",monospace;color:var(--muted)}
+
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <h1>Sorting my <em>Inbox</em></h1>
+    <div class="stats" id="stats"></div>
+  </div>
+  <div class="progress"><i id="prog"></i></div>
+  <div class="layout">
+    <div id="board"></div>
+    <aside class="pile">
+      <div class="top"><span>Loose mail</span><span class="who" id="who"></span></div>
+      <div class="stage">
+        <div class="hole"><b id="left">0</b><small id="holeLabel">waiting</small></div>
+        <div class="heap" id="heap"></div>
+      </div>
+      <div class="ticker" id="ticker"><small>Ready</small><div>Pick a batch size and press Sort.</div></div>
+    </aside>
+  </div>
+</div>
+
+<div class="bar" id="bar">
+  <button class="primary" id="next">Sort 1000</button>
+  <button id="apply" disabled>Add Gmail labels</button>
+  <span class="sep"></span>
+  <select id="bs" aria-label="Batch size"><option value="500">500</option><option value="1000" selected>1000</option><option value="2000">2000</option></select>
+  <button id="names">Hide subjects</button>
+  <span class="hint" id="hint"></span>
+</div>
+
+<div class="gate show" id="gate">
+  <div class="card">
+    <h2>Inbox <em>Sorter</em></h2>
+    <p>Watch your newest mail sort itself into ten piles, then add matching labels in Gmail with one click.</p>
+    <ul>
+      <li>Uses only sender, subject and date, never message text.</li>
+      <li>Sorting happens in this page. Gmail is reached through your own claude.ai Gmail connector.</li>
+      <li>Labels (<code>Sorter/&hellip;</code>) are only added. Nothing is archived, deleted, sent or marked read.</li>
+    </ul>
+    <div class="row">
+      <button class="primary" id="connect">Connect Gmail</button>
+      <button id="demo">Try demo</button>
+    </div>
+    <label><input type="checkbox" id="logos" checked> Show sender logos</label>
+    <div class="err" id="gateErr"></div>
+  </div>
+</div>
+
+<div class="confirm" id="confirm">
+  <div class="card">
+    <h3>Add labels?</h3>
+    <p id="confirmText"></p>
+    <div class="row"><button class="primary" id="confirmYes">Add labels</button><button id="confirmNo">Cancel</button></div>
+  </div>
+</div>
+
+<div class="tip" id="tip"></div>
+<aside class="drawer" id="drawer"><header><i></i><h3 id="dTitle"></h3><button id="dClose" aria-label="Close">×</button></header><ul id="dList"></ul></aside>
+<div class="done" id="done"><div class="card" id="doneCard"></div></div>
+
+
+<script>
+"use strict";
+// Rule-based classifier. Runs entirely in the browser. Input is only what Gmail's
+// metadata gives us: sender, subject, Gmail's own category labels and List-Unsubscribe.
+(function (root) {
+  const SLD = new Set(["co", "com", "org", "net", "ac", "gov"]);
+
+  function parseFrom(raw) {
+    raw = String(raw || "");
+    const m = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+    const email = (m ? m[2] : raw).trim().toLowerCase();
+    let name = (m ? m[1] : "").trim();
+    if (!name) name = email.split("@")[0] || email;
+    return { name, email };
+  }
+
+  // Registrable-ish domain: mail.news.example.co.uk -> example.co.uk
+  function domainOf(email) {
+    const h = (String(email).split("@")[1] || "").toLowerCase();
+    const p = h.split(".");
+    if (p.length <= 2) return h;
+    const tld = p[p.length - 1], sl = p[p.length - 2];
+    return (tld.length === 2 && SLD.has(sl) ? p.slice(-3) : p.slice(-2)).join(".");
+  }
+
+  const BULK_LOCAL = /^(no-?reply|do-?not-?reply|notifications?|notify|mailer|mailer-daemon|updates?|news|newsletter|marketing|hello|info|team|support|billing|receipts?|alerts?|digest|offers?|deals?|store|orders?|accounts?|security|service|events?)([+._-].*)?$/;
+  const isBulkAddr = email => BULK_LOCAL.test(String(email).split("@")[0] || "");
+
+  const R = {
+    leads: /new (form )?submission|contact form|enquiry|inquiry|new lead|form entry|you have a new (message|enquiry)|request a (quote|demo|call)/,
+    deployDomain: /(^|\.)(github|gitlab|bitbucket|circleci|vercel|netlify|travis-ci|codeberg|sourcehut|ghe)\./,
+    deploySubj: /deployment review|workflow run|ci\/cd|pipeline|pull request|run failed|build (failed|passed|succeeded)|\[[^\]]+\/[^\]]+\]/,
+    alerts: /\b(uptime|server health|disk (space|usage|warning)|cpu|memory (usage|warning)|monitor|recovered|is down|outage|incident|status page|latency|error rate|degraded)\b|\b(up|down):/,
+    security: /security|vulnerab|malware|lockout|suspicious|breach|scan report|file change|new sign-?in|login attempt|2fa|two-factor|2-step/,
+    socialDomain: /(^|\.)(linkedin|facebook|facebookmail|twitter|x|instagram|pinterest|tiktok|reddit|redditmail|youtube|discord|snapchat|quora|meetup|nextdoor|threads|mastodon)\./,
+    promos: /\d+\s?% off|% off|\bsale\b|\bdeals?\b|discount|black friday|cyber monday|limited[- ]time|last chance|free shipping|coupon|save \d+|webinar|you(?:'|’)re invited|exclusive offer|ends (soon|tonight|today)|final hours|early access/,
+    vendors: /invoice|receipt|payment|billing|your order|order\s?#|subscription|renew|statement|payout|your account|policy|terms of|verification code|password reset|reset your password|confirm your|welcome to|trial/,
+    news: /digest|newsletter|weekly|roundup|this week|issue #|edition|\bnews\b|tips|ten tabs/,
+  };
+
+  function classify(m) {
+    const subj = String(m.subject || "").toLowerCase();
+    const labels = m.labelIds || [];
+    const dom = domainOf(m.email);
+    const bulk = isBulkAddr(m.email) || !!m.unsub;
+    const has = l => labels.indexOf(l) !== -1;
+
+    if (R.leads.test(subj)) return "leads";
+    if (R.deployDomain.test(m.email.split("@")[1] || "") || (bulk && R.deploySubj.test(subj))) return "deploys";
+    if (R.alerts.test(subj)) return "alerts";
+    if (R.security.test(subj)) return "security";
+    if (has("CATEGORY_SOCIAL") || R.socialDomain.test(dom + ".")) return "social";
+    if (has("CATEGORY_PROMOTIONS") || (bulk && R.promos.test(subj))) return "promos";
+    if (bulk && R.vendors.test(subj)) return "vendors";
+    if (m.unsub || has("CATEGORY_FORUMS") || (bulk && R.news.test(subj))) return "newsletters";
+    if (has("CATEGORY_UPDATES") && bulk) return "vendors";
+    if (bulk) return "vendors";
+    return "people";
+  }
+
+  // Same sender + subject once numbers, hashes and emoji are stripped.
+  function patternKey(m) {
+    return m.email + "|" + String(m.subject || "").toLowerCase()
+      .replace(/\p{Extended_Pictographic}/gu, "")
+      .replace(/\b[0-9a-f]{7,40}\b/g, "#")
+      .replace(/\d+/g, "#")
+      .replace(/\s+/g, " ").trim();
+  }
+
+  root.Classifier = { classify, parseFrom, domainOf, patternKey };
+})(typeof window !== "undefined" ? window : globalThis);
+
+</script>
+<script>
+"use strict";
+// Made-up inbox for "Try demo". No real mail, no network.
+(function (root) {
+  const T = [
+    // [name, email, subjects[], labelIds, unsub, weight]
+    ["GitHub", "notifications@github.com", ["[acme/web] Run failed: CI - main", "[acme/api] Pull request #{n}: Fix pagination", "Deployment review in acme/web"], [], false, 9],
+    ["StatusCake", "noreply@statuscake.com", ["DOWN: acme.com — Uptime", "UP: acme.com — Uptime recovered", "Server health: disk 84% used"], ["CATEGORY_UPDATES"], false, 10],
+    ["Sentry", "noreply@md.getsentry.com", ["Weekly report for acme-web", "New issue: TypeError in checkout"], ["CATEGORY_UPDATES"], true, 3],
+    ["WordPress", "wordpress@acme.com", ["[acme.com] Daily Security Digest", "[acme.com] Site scan report: Vulnerable Software", "[acme.com] File Change Warning"], [], false, 7],
+    ["LinkedIn", "notifications-noreply@linkedin.com", ["You have {n} new messages", "Jobs you may like", "{n} people viewed your profile"], ["CATEGORY_SOCIAL"], true, 5],
+    ["Pinterest", "recommendations@pinterest.com", ["Pins picked for you", "Ideas for your next project"], ["CATEGORY_SOCIAL"], true, 3],
+    ["Canva", "product@canva.com", ["There's an easier way to align your design elements", "New templates for you"], ["CATEGORY_PROMOTIONS"], true, 4],
+    ["Parallels", "announce@parallels.com", ["Save {n}% off Parallels Desktop", "Black Friday: {n}% off ends soon"], ["CATEGORY_PROMOTIONS"], true, 4],
+    ["Zapier", "events@zapier.com", ["[You're invited] Webinar: automate more", "Last chance to register"], ["CATEGORY_PROMOTIONS"], true, 3],
+    ["Mozilla", "firefox@mozilla.org", ["Ten Tabs: this week's best reads"], ["CATEGORY_FORUMS"], true, 3],
+    ["Smashing Magazine", "newsletter@smashingmagazine.com", ["Smashing Newsletter issue #{n}"], ["CATEGORY_FORUMS"], true, 3],
+    ["Stripe", "receipts@stripe.com", ["Your receipt from Acme #{n}", "Payment of $49.00 succeeded"], ["CATEGORY_UPDATES"], false, 3],
+    ["Google", "no-reply@accounts.google.com", ["Security alert: new sign-in on Mac"], [], false, 2],
+    ["Namecheap", "support@namecheap.com", ["Your domain renews in 30 days", "Invoice #{n} is ready"], ["CATEGORY_UPDATES"], false, 3],
+    ["Acme Forms", "forms@acme.com", ["New submission from Contact form", "New enquiry from website"], [], false, 2],
+    ["Maya Patel", "maya@clientco.com", ["Re: Homepage feedback", "Quick question about the launch date"], ["CATEGORY_PERSONAL"], false, 3],
+    ["Tom Becker", "tom@studio.dev", ["Lunch on Thursday?", "Invoice for last month"], ["CATEGORY_PERSONAL"], false, 2],
+    ["Google Calendar", "calendar-notification@google.com", ["Invitation: Sprint planning @ Tue 10:00"], ["CATEGORY_UPDATES"], false, 2],
+    ["Cloudflare", "noreply@notify.cloudflare.com", ["Cloudflare: incident on your zone", "Your monthly report"], ["CATEGORY_UPDATES"], false, 2],
+  ];
+
+  const TOPICS = ["autumn edition","new this week","for teams","your report","part two","update","reminder","what's new","a quick note","before Friday","in case you missed it","top picks","Q4 plan","design tips","billing change","for you","final call","recap","roadmap","hello again","next steps","today only","how it works","new feature","checklist","summary","spotlight","fresh ideas","get started","community"];
+
+  // Small seeded PRNG so the demo looks the same every time.
+  function rng(seed) { return () => (seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296; }
+
+  function build(total) {
+    const rand = rng(7), pool = [], wsum = T.reduce((a, t) => a + t[5], 0);
+    const now = Date.now();
+    for (let i = 0; i < total; i++) {
+      let r = rand() * wsum, t = T[0];
+      for (const x of T) { r -= x[5]; if (r <= 0) { t = x; break; } }
+      let subj = t[2][Math.floor(rand() * t[2].length)].replace("{n}", String(1 + Math.floor(rand() * 90)));
+      // Monitoring mail repeats for real; everything else gets some variety so the demo isn't one big pile.
+      if (!/StatusCake|GitHub|Cloudflare/.test(t[0]) && rand() < 0.7) subj += " — " + TOPICS[Math.floor(rand() * TOPICS.length)];
+      pool.push({
+        id: "demo" + i, threadId: "demo" + i,
+        from: `${t[0]} <${t[1]}>`, subject: subj,
+        labelIds: ["INBOX", "UNREAD"].concat(t[3]), unsub: t[4],
+        date: new Date(now - i * 3.1e6).toISOString(),
+      });
+    }
+    return pool;
+  }
+
+  let pool = null, cursor = 0;
+  root.Demo = {
+    next(n) { pool = pool || build(4000); const out = pool.slice(cursor, cursor + n); cursor += out.length; return out; },
+    unread: 28450,
+  };
+})(window);
+
+</script>
+<script>
+"use strict";
+// Same interface as extension/gmail.js, but the calls go through the viewer's own claude.ai
+// Gmail connector (the artifact `mcp` capability). No tokens, no OAuth setup, no server.
+(function (root) {
+  const SERVER = "Gmail";
+  const PREFIX = "Sorter";
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const COLOR = { People: "BLUE", Leads: "GREEN", Alerts: "RED", Security: "YELLOW", Deploys: "DARK_GRAY", Newsletters: "PURPLE", Promos: "ORANGE", Social: "PINK", Vendors: "BROWN" };
+
+  let mcp = null;
+  const meta = new Map(); // threadId -> row, filled while listing
+
+  function friendly(e) {
+    const code = e && e.code;
+    if (code === "server_not_connected") return "Gmail is not connected in claude.ai. Add it in Settings → Connectors, then reload this page.";
+    if (code === "needs_reauth") return "The Gmail connector needs to be reconnected in claude.ai Settings → Connectors.";
+    if (code === "not_in_manifest" || code === "approval_required" || code === "consent_required") return "Access to Gmail was not allowed for this page. Reload and choose Allow when asked.";
+    if (code === "blocked_by_policy") return "Your organization blocks this Gmail action.";
+    if (code === "selection_required") return "You have more than one Gmail connector. Choose one when claude.ai asks.";
+    return (e && e.message) || "Gmail did not answer.";
+  }
+
+  async function ns() {
+    if (mcp) return mcp;
+    const m = window.claude && (await window.claude.use("mcp"));
+    if (!m) throw new Error("Open this page in claude.ai with the Gmail connector connected. Demo mode works anywhere.");
+    return (mcp = m);
+  }
+
+  async function call(tool, input) {
+    const m = await ns();
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await m.callTool(SERVER, tool, input || {}, { cache: false });
+        let p = r.payload;
+        if (typeof p === "string") { try { p = JSON.parse(p); } catch (e) {} }
+        return p || {};
+      } catch (e) {
+        // Retry only reads, once. A rejected write may still have run.
+        if (e && e.retryable && attempt < 1 && tool !== "label_thread" && tool !== "create_label") { await sleep((e.retryAfterMs || 1500) + Math.random() * 500); continue; }
+        throw new Error(friendly(e));
+      }
+    }
+  }
+
+  async function pool(items, size, fn) {
+    let i = 0;
+    await Promise.all(Array.from({ length: Math.min(size, items.length) }, async () => {
+      while (i < items.length) { const k = i++; await fn(items[k], k); }
+    }));
+  }
+
+  function row(t) {
+    const ms = t.messages || [], m = ms[ms.length - 1] || {};
+    const dn = ((m.addressDisplayNames || []).find(a => a.emailAddress === m.sender) || {}).displayName;
+    return {
+      id: t.id, threadId: t.id,
+      from: dn ? `${dn} <${m.sender}>` : String(m.sender || ""),
+      subject: m.subject || "", labelIds: m.labelIds || [], unsub: false,
+      date: m.date || new Date().toISOString(),
+    };
+  }
+
+  const Gmail = {
+    PREFIX,
+    async connect() { await call("list_labels"); }, // first call asks the viewer to allow the connector
+
+    async profile() {
+      const labels = (await call("list_labels")).labels || [];
+      const inbox = labels.find(l => l.labelId === "INBOX") || {};
+      return { email: "your Gmail", inboxUnread: inbox.messagesUnread, inboxThreads: inbox.threadsTotal };
+    },
+
+    // Newest inbox threads that carry no Sorter label yet.
+    async unsortedIds(limit, skip, onProgress) {
+      const ids = [];
+      let pageToken, pages = 0;
+      while (ids.length < limit && pages++ < 60) {
+        const r = await call("search_threads", { query: `in:inbox -label:${PREFIX}`, pageSize: 50, view: "THREAD_VIEW_SUMMARY", pageToken });
+        for (const t of r.threads || []) {
+          if (skip.has(t.id) || meta.has(t.id)) continue;
+          meta.set(t.id, row(t)); ids.push(t.id);
+          if (ids.length >= limit) break;
+        }
+        onProgress && onProgress(ids.length, limit);
+        pageToken = r.nextPageToken;
+        if (!pageToken) break;
+      }
+      return ids;
+    },
+
+    async fetchMeta(ids, onProgress) {
+      const out = ids.map(id => meta.get(id)).filter(Boolean);
+      ids.forEach(id => meta.delete(id));
+      onProgress && onProgress(out.length, out.length);
+      return out;
+    },
+
+    async ensureLabels(names) {
+      const have = {};
+      for (const l of (await call("list_labels")).labels || []) have[l.name] = l.labelId;
+      for (const n of names) {
+        if (have[n]) continue;
+        const color = COLOR[n.split("/")[1]];
+        const l = await call("create_label", { displayName: n, ...(color ? { colorPreset: "LABEL_COLOR_PRESET_" + color } : {}) });
+        have[n] = l.labelId;
+      }
+      return have;
+    },
+
+    // One call per conversation: the connector has no bulk label tool. Only adds a label.
+    async addLabel(labelId, threadIds, onProgress) {
+      let done = 0;
+      await pool(threadIds, 6, async id => {
+        await call("label_thread", { threadId: id, labelIds: [labelId] });
+        onProgress && onProgress(++done);
+      });
+    },
+  };
+
+  root.Gmail = Gmail;
+})(window);
+
+</script>
+<script>
+"use strict";
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const color = k => `var(--${k === "repeats" ? "other" : k})`;
+
+// ---- piles -----------------------------------------------------------------
+const PILES = [
+  { key: "people", name: "People", label: "People" },
+  { key: "leads", name: "Leads & forms", label: "Leads" },
+  { key: "alerts", name: "Server alerts", label: "Alerts" },
+  { key: "security", name: "Security", label: "Security" },
+  { key: "deploys", name: "Deploys & CI", label: "Deploys" },
+  { key: "newsletters", name: "Newsletters", label: "Newsletters" },
+  { key: "promos", name: "Promotions", label: "Promos" },
+  { key: "social", name: "Social", label: "Social" },
+  { key: "vendors", name: "Receipts & accounts", label: "Vendors" },
+];
+const NAME = Object.fromEntries(PILES.map(p => [p.key, p.name])); NAME.repeats = "Repeats ↻";
+// [grid-column, grid-row] around the centre ring
+const SLOT = {
+  people: ["1", "1"], leads: ["2", "1"], alerts: ["1", "2"], security: ["2", "2"], deploys: ["1 / 3", "3"],
+  newsletters: ["4", "1"], promos: ["5", "1"], social: ["4", "2"], vendors: ["5", "2"], repeats: ["4 / 6", "3"],
+};
+
+const S = {
+  mode: null,            // "gmail" | "demo"
+  logos: true,
+  buckets: {},
+  seenThreads: new Set(), seenPattern: new Set(),
+  sorted: 0, applied: 0,
+  pending: [],           // [{ id, cat }] sorted but not labelled yet
+  profile: null, busy: false, run: null, batchNo: 0,
+};
+
+// ---- helpers ---------------------------------------------------------------
+const dom = email => Classifier.domainOf(email);
+function logo(t) {
+  const d = dom(t.email), l = esc((d[0] || "?").toUpperCase());
+  if (!d || !S.logos) return `<s>${l}</s>`;
+  const src = (`https://www.google.com/s2/favicons?domain=${encodeURIComponent(d)}&sz=64`;
+  return `<img src="${src}" alt="" data-l="${l}">`;
+}
+// Extension pages forbid inline handlers, so image failures are caught here instead.
+document.addEventListener("error", e => {
+  const el = e.target;
+  if (el && el.tagName === "IMG" && el.dataset.l) el.outerHTML = `<s>${el.dataset.l}</s>`;
+}, true);
+
+const fmt = n => n == null ? "–" : Number(n).toLocaleString("en").replace(/,/g, " ");
+const cnt = k => S.buckets[k] ? S.buckets[k].items.length : 0;
+
+function stats() {
+  const unread = S.mode === "demo" ? Demo.unread : S.profile && S.profile.inboxUnread;
+  const list = [
+    ["Inbox unread", fmt(unread)], ["Sorted", fmt(S.sorted)],
+    ["Need you", cnt("people") + cnt("leads"), true],
+    ["Machine mail", cnt("alerts") + cnt("security") + cnt("deploys")],
+    ["Marketing", cnt("newsletters") + cnt("promos") + cnt("social")],
+    ["Repeats found", cnt("repeats"), true],
+  ];
+  $("#stats").innerHTML = list.map(([l, v, hot]) => `<div class="stat${hot ? " hot" : ""}"><small>${l}</small><b>${v}</b></div>`).join("");
+}
+
+function hint(text) { $("#hint").textContent = text || ""; }
+
+// ---- board -----------------------------------------------------------------
+function buildBoard() {
+  const grid = document.createElement("div");
+  grid.className = "board";
+  for (const key of [...PILES.map(p => p.key), "repeats"]) {
+    const el = document.createElement("div");
+    el.className = "bucket";
+    el.style.setProperty("--c", color(key));
+    el.style.setProperty("--gc", SLOT[key][0]);
+    el.style.setProperty("--gr", SLOT[key][1]);
+    el.innerHTML = `<header><i></i>${NAME[key]}<span>0</span></header><div class="cells"></div>`;
+    el.addEventListener("click", () => openDrawer(key));
+    grid.appendChild(el);
+    S.buckets[key] = { key, el, cells: el.querySelector(".cells"), count: el.querySelector("header span"), items: [], cap: 0 };
+  }
+  grid.appendChild($(".pile"));
+  $("#board").appendChild(grid);
+}
+
+function capacity(b) {
+  const size = 22, gap = 4;
+  return Math.max(1, Math.floor((b.cells.clientWidth + gap) / (size + gap))) * Math.max(1, Math.floor((b.cells.clientHeight + gap) / (size + gap)));
+}
+
+function renderPile(b) {
+  b.cap = capacity(b);
+  b.cells.innerHTML = "";
+  for (let i = 0; i < b.cap; i++) b.cells.appendChild(document.createElement("div")).className = "cell";
+  b.items.slice(0, b.cap).forEach((t, i) => paintCell(b, i, t));
+  if (b.items.length > b.cap) moreCell(b);
+  b.count.textContent = b.items.length;
+}
+function paintCell(b, slot, t) {
+  const c = b.cells.children[slot]; if (!c) return;
+  c.className = "cell on" + (t.unread ? "" : " read");
+  c.style.setProperty("--c", color(b.key === "repeats" ? t.cat : t.dest));
+  c.innerHTML = logo(t);
+  hoverTip(c, t);
+}
+function moreCell(b) {
+  const last = b.cells.lastElementChild;
+  last.innerHTML = ""; last.textContent = "+" + (b.items.length - b.cap + 1); last.className = "cell on more-cell";
+}
+function renderAllPiles() { for (const k in S.buckets) renderPile(S.buckets[k]); }
+
+// ---- the ring --------------------------------------------------------------
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const ring = { W: 0, H: 0, R: 0 };
+
+function renderHeap(queue) {
+  const heap = $("#heap");
+  heap.innerHTML = "";
+  ring.W = heap.clientWidth - 50; ring.H = heap.clientHeight - 35; ring.R = Math.min(ring.W, ring.H) / 2;
+  queue.forEach((t, idx) => {
+    const e = document.createElement("div");
+    e.className = "env" + (t.unread ? "" : " read");
+    e.style.setProperty("--c", color(t.cat));
+    e.style.zIndex = queue.length - idx;
+    e.innerHTML = logo(t);
+    t.ang = Math.random() * Math.PI * 2;
+    t.rr = Math.sqrt(0.3 + Math.random() * 0.7);
+    t.rot = (Math.random() * 50 - 25).toFixed(1);
+    hoverTip(e, t);
+    heap.appendChild(e);
+    t.node = e;
+  });
+}
+
+function spin(now) {
+  const run = S.run;
+  if (run && !still) {
+    const ph = now / 1000;
+    for (let i = run.i; i < run.queue.length; i++) {
+      const t = run.queue[i]; if (!t.node) continue;
+      const a = t.ang + ph * (0.5 - 0.22 * t.rr);
+      t.node.style.transform = `translate(${ring.W / 2 + Math.cos(a) * t.rr * ring.R}px,${ring.H / 2 + Math.sin(a) * t.rr * ring.R}px) rotate(${t.rot}deg)`;
+    }
+  }
+  requestAnimationFrame(spin);
+}
+
+function animate(queue) {
+  return new Promise(resolve => {
+    const run = S.run = { queue, i: 0, done: 0, resolve };
+    renderHeap(queue);
+    $("#left").textContent = queue.length; $("#holeLabel").textContent = "left to sort";
+    const gap = Math.max(5, 14000 / queue.length);
+    (function tick() {
+      if (run.i >= queue.length) return;
+      launch(run, queue[run.i++]);
+      setTimeout(tick, gap);
+    })();
+  });
+}
+
+function launch(run, t) {
+  const b = S.buckets[t.dest], slot = b.items.length;
+  b.items.push(t);
+  const cell = slot < b.cap ? b.cells.children[slot] : b.cells.lastElementChild;
+  const r0 = t.node.getBoundingClientRect(), nw = t.node.offsetWidth, nh = t.node.offsetHeight;
+  const from = { left: r0.left + r0.width / 2 - nw / 2, top: r0.top + r0.height / 2 - nh / 2, width: nw, height: nh };
+  const to = cell.getBoundingClientRect();
+  const fly = t.node;
+  fly.classList.add("flying");
+  fly.style.left = from.left + "px"; fly.style.top = from.top + "px"; fly.style.transform = "none";
+  document.body.appendChild(fly);
+  $("#left").textContent = run.queue.length - run.i;
+  $("#ticker").style.setProperty("--c", color(t.dest === "repeats" ? t.cat : t.dest));
+  $("#ticker").innerHTML = `<small>Sorting ${run.i} of ${run.queue.length}</small><div><span class="to">${esc(NAME[t.dest])}</span>${esc(t.name || "")}</div><div class="subj" style="color:var(--muted)">${esc(t.subject || "(no subject)")}</div>`;
+  const dx = to.left - from.left + (to.width - from.width) / 2, dy = to.top - from.top + (to.height - from.height) / 2;
+  const s = to.width / from.width, lift = -Math.min(160, Math.abs(dx) * .25 + 60), spin0 = Math.random() * 40 - 20;
+  const anim = fly.animate([
+    { transform: `translate(0,0) rotate(${spin0}deg) scale(1)` },
+    { transform: `translate(${dx * .45}px,${dy * .45 + lift}px) rotate(${spin0 / 2}deg) scale(1.25)`, offset: .45 },
+    { transform: `translate(${dx}px,${dy}px) rotate(0deg) scale(${s})`, opacity: .9 },
+  ], { duration: 260, easing: "cubic-bezier(.45,.05,.3,1)", fill: "forwards" });
+  anim.onfinish = () => {
+    fly.remove();
+    run.done++; S.sorted++;
+    if (slot < b.cap) paintCell(b, slot, t); else moreCell(b);
+    b.count.textContent = b.items.length;
+    b.el.classList.remove("pulse"); void b.el.offsetWidth; b.el.classList.add("pulse");
+    stats();
+    $("#prog").style.width = (run.done / run.queue.length * 100) + "%";
+    if (run.done === run.queue.length) { S.run = null; run.resolve(); }
+  };
+}
+
+// ---- tooltip + drawer ------------------------------------------------------
+const tip = $("#tip");
+function hoverTip(el, t) {
+  el.addEventListener("mouseenter", () => {
+    if (document.body.classList.contains("nonames")) return;
+    tip.innerHTML = `<b>${esc(t.name || t.email)}</b>${esc(t.subject || "")}`;
+    tip.style.opacity = 1;
+  });
+  el.addEventListener("mousemove", e => { tip.style.left = Math.min(e.clientX + 14, innerWidth - 330) + "px"; tip.style.top = (e.clientY + 14) + "px"; });
+  el.addEventListener("mouseleave", () => { tip.style.opacity = 0; });
+}
+
+function openDrawer(key) {
+  const b = S.buckets[key], hide = document.body.classList.contains("nonames");
+  const d = $("#drawer");
+  d.style.setProperty("--c", color(key));
+  $("#dTitle").textContent = `${NAME[key]} · ${b.items.length}`;
+  const rows = [...b.items].sort((x, y) => (y.date || "").localeCompare(x.date || "")).slice(0, 300);
+  $("#dList").innerHTML = rows.length ? rows.map(t => `
+    <li style="--c:${color(t.cat)}"><a href="${S.mode === "gmail" ? "https://mail.google.com/mail/u/0/#all/" + esc(t.threadId) : "#"}" target="_blank" rel="noopener">
+      ${logo(t)}
+      <span class="s">${hide ? "•••" : esc(t.subject || "(no subject)")}<small>${esc(t.name || t.email || "")}</small></span>
+      <time>${t.date ? new Date(t.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : ""}</time>
+    </a></li>`).join("") : '<li class="empty">Nothing sorted here yet.</li>';
+  d.classList.add("open");
+}
+
+// ---- batches ---------------------------------------------------------------
+function shuffleSome(a) { for (let i = a.length - 1; i > 0; i--) if (Math.random() < .35) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } }
+
+function prepare(raw) {
+  const items = raw.map(m => {
+    const p = Classifier.parseFrom(m.from);
+    const it = { id: m.id, threadId: m.threadId, name: p.name, email: p.email, subject: m.subject, date: m.date, unread: (m.labelIds || []).indexOf("UNREAD") !== -1 };
+    it.cat = Classifier.classify({ email: p.email, subject: m.subject, labelIds: m.labelIds, unsub: m.unsub });
+    S.seenThreads.add(m.threadId);
+    return it;
+  }).reverse(); // oldest first, so the first of a repeating pattern keeps its own pile
+  for (const it of items) {
+    const key = Classifier.patternKey({ email: it.email, subject: it.subject });
+    it.dest = S.seenPattern.has(key) ? "repeats" : it.cat;
+    S.seenPattern.add(key);
+  }
+  shuffleSome(items);
+  return items;
+}
+
+async function sortBatch() {
+  if (S.busy || !S.mode) return;
+  if (!S.buckets.people.cap) renderAllPiles(); // layout not measured yet
+  S.busy = true; setButtons(); $("#done").classList.remove("show"); hint("");
+  try {
+    const n = +$("#bs").value;
+    let raw;
+    if (S.mode === "demo") raw = Demo.next(n);
+    else {
+      $("#holeLabel").textContent = "reading inbox"; $("#left").textContent = "…";
+      const ids = await Gmail.unsortedIds(n, S.seenThreads, (d, t) => { $("#left").textContent = d; $("#holeLabel").textContent = `found, of ${t}`; });
+      raw = await Gmail.fetchMeta(ids, (d, t) => { $("#left").textContent = d; $("#holeLabel").textContent = `of ${t} read`; });
+    }
+    if (!raw.length) {
+      $("#left").textContent = "0"; $("#holeLabel").textContent = "all sorted";
+      $("#ticker").innerHTML = "<small>Done</small><div>No unsorted inbox mail left.</div>";
+      return;
+    }
+    const items = prepare(raw);
+    const before = S.buckets; // piles keep growing across batches
+    await animate(items);
+    S.batchNo++;
+    for (const it of items) S.pending.push({ id: it.id, cat: it.cat });
+    summary(items);
+  } catch (e) {
+    $("#ticker").innerHTML = `<small>Problem</small><div style="color:var(--alerts);white-space:normal">${esc(e.message || e)}</div>`;
+  } finally {
+    S.busy = false; setButtons();
+  }
+}
+
+function summary(items) {
+  const per = {};
+  for (const it of items) per[it.cat] = (per[it.cat] || 0) + 1;
+  const rows = Object.entries(per).sort((a, b) => b[1] - a[1]), max = rows[0][1];
+  const noise = items.filter(i => !["people", "leads"].includes(i.cat)).length;
+  const reps = items.filter(i => i.dest === "repeats").length;
+  $("#doneCard").innerHTML = `<h3>Sorted <em>${items.length}</em> threads</h3>
+    <p>${Math.round(noise / items.length * 100)}% is machines, marketing or receipts, ${reps} are repeats. ${items.length - noise} look like they need a human.</p>
+    <div class="bars">${rows.map(([k, n]) => `<div style="--c:${color(k)}">${esc(NAME[k])}<span style="width:${n / max * 100}%"></span><em>${n}</em></div>`).join("")}</div>
+    <div class="row">${S.mode === "gmail" ? '<button class="primary" id="sumApply">Add Gmail labels…</button>' : ""}<button id="sumNext">Sort next batch</button><button id="sumClose">Look at the piles</button></div>`;
+  $("#done").classList.add("show");
+  const on = (id, f) => { const el = $(id); if (el) el.addEventListener("click", f); };
+  on("#sumApply", () => { $("#done").classList.remove("show"); askApply(); });
+  on("#sumNext", () => { $("#done").classList.remove("show"); sortBatch(); });
+  on("#sumClose", () => $("#done").classList.remove("show"));
+}
+
+function setButtons() {
+  const n = $("#bs").value;
+  $("#next").textContent = S.busy ? "Working…" : (S.batchNo ? `Sort next ${n}` : `Sort ${n}`);
+  $("#next").disabled = S.busy || !S.mode;
+  $("#apply").disabled = S.busy || S.mode !== "gmail" || !S.pending.length;
+  $("#apply").textContent = S.pending.length ? `Add Gmail labels (${S.pending.length})` : "Add Gmail labels";
+  $("#bs").disabled = S.busy;
+}
+
+// ---- Gmail labels ----------------------------------------------------------
+function askApply() {
+  const per = {};
+  for (const p of S.pending) per[p.cat] = (per[p.cat] || 0) + 1;
+  const names = Object.keys(per).map(k => `Sorter/${PILES.find(x => x.key === k).label}`);
+  $("#confirmText").textContent = `Adds a Sorter/… label to ${S.pending.length} conversations (${names.length} labels, created if missing). Nothing is archived, deleted, sent or marked read. To undo, delete the Sorter labels in Gmail.`;
+  $("#confirm").classList.add("show");
+}
+
+async function applyLabels() {
+  $("#confirm").classList.remove("show");
+  if (S.busy || !S.pending.length) return;
+  S.busy = true; setButtons(); hint("Adding labels…");
+  try {
+    const byCat = {};
+    for (const p of S.pending) (byCat[p.cat] = byCat[p.cat] || []).push(p.id);
+    const wanted = Object.keys(byCat).map(k => `${Gmail.PREFIX}/${PILES.find(x => x.key === k).label}`);
+    const ids = await Gmail.ensureLabels(wanted);
+    let done = 0;
+    for (const k of Object.keys(byCat)) {
+      const base = done;
+      await Gmail.addLabel(ids[`${Gmail.PREFIX}/${PILES.find(x => x.key === k).label}`], byCat[k], n => hint(`Labelled ${base + n} of ${S.pending.length}…`));
+      done += byCat[k].length;
+    }
+    S.applied += done; S.pending = [];
+    hint(`Added labels to ${done} conversations. Check Gmail's Sorter folder.`);
+  } catch (e) {
+    hint(String(e.message || e));
+  } finally {
+    S.busy = false; setButtons();
+  }
+}
+
+// ---- start screen ----------------------------------------------------------
+function enter(mode) {
+  S.mode = mode; S.logos = $("#logos").checked;
+  $("#gate").classList.remove("show");
+  $("#who").textContent = mode === "demo" ? "demo data, not your mail" : (S.profile ? S.profile.email : "");
+  stats(); setButtons();
+  hint(mode === "demo" ? "Demo: made-up mail. Gmail is not touched." : "");
+}
+
+$("#demo").addEventListener("click", () => enter("demo"));
+$("#connect").addEventListener("click", async () => {
+  const err = $("#gateErr"); err.textContent = "";
+  try {
+    const m = typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.getManifest && chrome.runtime.getManifest();
+    if (m && m.oauth2 && /^YOUR_/.test(m.oauth2.client_id)) throw new Error("Set your OAuth client ID in manifest.json first (see README).");
+    $("#connect").disabled = true; err.textContent = "Waiting for Google…";
+    await Gmail.connect();
+    S.profile = await Gmail.profile();
+    err.textContent = "";
+    enter("gmail");
+  } catch (e) { err.textContent = String(e.message || e); }
+  finally { $("#connect").disabled = false; }
+});
+
+$("#next").addEventListener("click", sortBatch);
+$("#apply").addEventListener("click", askApply);
+$("#confirmYes").addEventListener("click", applyLabels);
+$("#confirmNo").addEventListener("click", () => $("#confirm").classList.remove("show"));
+$("#bs").addEventListener("change", setButtons);
+$("#names").addEventListener("click", () => { document.body.classList.toggle("nonames"); $("#names").classList.toggle("on"); });
+$("#dClose").addEventListener("click", () => $("#drawer").classList.remove("open"));
+addEventListener("keydown", e => { if (e.key === "Escape") { $("#drawer").classList.remove("open"); $("#done").classList.remove("show"); $("#confirm").classList.remove("show"); } });
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => { if (!S.run) renderAllPiles(); }, 200); });
+
+buildBoard();
+requestAnimationFrame(() => { renderAllPiles(); stats(); setButtons(); });
+requestAnimationFrame(spin);
+
+</script>
+
+</body></html>
